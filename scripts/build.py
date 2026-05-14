@@ -92,6 +92,11 @@ def slugify(value: str) -> str:
     return normalized.strip("-") or "untitled"
 
 
+def safe_slug(value: str) -> str:
+    """Return a single safe URL/path segment for content slugs."""
+    return slugify(value)
+
+
 def render_inline(text: str) -> str:
     """Escape HTML, then apply inline markdown."""
     out = html.escape(text, quote=False)
@@ -257,7 +262,7 @@ def load_post(path: Path) -> Post:
     missing = [k for k in required if k not in meta]
     if missing:
         raise ValueError(f"{path.name}: missing front matter keys: {missing}")
-    slug = meta.get("slug") or path.stem
+    slug = safe_slug(meta.get("slug") or path.stem)
     return Post(
         slug=slug,
         title=meta["title"],
@@ -276,7 +281,7 @@ def load_page(path: Path) -> Page:
     if "title" not in meta:
         raise ValueError(f"{path.name}: missing 'title' in front matter")
     return Page(
-        slug=meta.get("slug") or path.stem,
+        slug=safe_slug(meta.get("slug") or path.stem),
         title=meta["title"],
         body_html=render_markdown(body),
     )
@@ -286,6 +291,7 @@ def load_all_posts() -> list[Post]:
     if not POSTS_DIR.exists():
         return []
     posts = [load_post(p) for p in sorted(POSTS_DIR.glob("*.md"))]
+    _assert_unique_slugs(posts, "post")
     posts.sort(key=lambda p: p.date, reverse=True)
     return posts
 
@@ -293,7 +299,18 @@ def load_all_posts() -> list[Post]:
 def load_all_pages() -> list[Page]:
     if not PAGES_DIR.exists():
         return []
-    return [load_page(p) for p in sorted(PAGES_DIR.glob("*.md"))]
+    pages = [load_page(p) for p in sorted(PAGES_DIR.glob("*.md"))]
+    _assert_unique_slugs(pages, "page")
+    return pages
+
+
+def _assert_unique_slugs(items: list[Post] | list[Page], kind: str) -> None:
+    seen: dict[str, str] = {}
+    for item in items:
+        title = getattr(item, "title", item.slug)
+        if item.slug in seen:
+            raise ValueError(f"duplicate {kind} slug '{item.slug}' for {seen[item.slug]!r} and {title!r}")
+        seen[item.slug] = title
 
 
 # ---------------------------------------------------------------------------
@@ -369,9 +386,9 @@ def render_home(posts: list[Post]) -> str:
   <h1>{html.escape(SITE_TITLE)}</h1>
   <p class="tagline">{html.escape(SITE_TAGLINE)}</p>
   <p class="intro">
-    現在這裡有兩篇——一篇講怎麼讀自己的 LLM 帳單、找出哪段對話最燒錢，
-    一篇講怎麼用書面紀錄留下「我當時的真實想法」，
-    讓未來的自己沒辦法事後重寫成更聰明的版本。看看哪篇對你有用就好。
+    現在這裡有三篇：第一篇說清楚這個地方為什麼存在，
+    另外兩篇分別講怎麼讀自己的 LLM 帳單、以及怎麼用書面紀錄留下「我當時的真實想法」。
+    看看哪篇對你有用就好。
   </p>
 </section>
 <section class="recent">
@@ -544,6 +561,7 @@ def render_search_index(posts: list[Post]) -> str:
             "url": p.url,
             "date": p.date_iso,
             "section": p.section,
+            "tags": p.tags,
             "summary": p.summary,
             "text": plain_text(p.body_text)[:5000],
         }

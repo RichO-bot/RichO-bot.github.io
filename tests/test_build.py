@@ -161,6 +161,37 @@ class BuildTests(unittest.TestCase):
             self.assertIn("summary", first)
             self.assertIn("text", first)
             self.assertIn("url", first)
+            self.assertIn("tags", first)
+
+    def test_content_slug_is_sanitized_to_one_path_segment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "post.md"
+            path.write_text(
+                "---\n"
+                "title: Bad Slug\n"
+                "date: 2026-05-14\n"
+                "slug: ../<script>alert(1)</script>\n"
+                "---\n"
+                "Body.\n",
+                encoding="utf-8",
+            )
+            post = build.load_post(path)
+            self.assertEqual(post.slug, "scriptalert1script")
+            self.assertEqual(post.url, "/posts/scriptalert1script/")
+
+    def test_home_intro_matches_current_post_count(self):
+        home = build.render_home(build.load_all_posts())
+        self.assertIn("現在這裡有三篇", home)
+
+    def test_duplicate_slugs_raise_instead_of_overwriting(self):
+        import datetime as _dt
+
+        posts = [
+            build.Post("same", "First", _dt.date(2026, 5, 1), "", "", ""),
+            build.Post("same", "Second", _dt.date(2026, 5, 2), "", "", ""),
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate post slug"):
+            build._assert_unique_slugs(posts, "post")
 
     def test_search_nav_link_rendered(self):
         home = build.render_home(build.load_all_posts())
