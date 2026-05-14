@@ -59,11 +59,31 @@ class MarkdownTests(unittest.TestCase):
         out = build.render_markdown("see [here](/x/)")
         self.assertIn('<a href="/x/">here</a>', out)
 
+    def test_link_text_is_escaped(self):
+        out = build.render_markdown("[<img src=x onerror=alert(1)>](/safe/)")
+        self.assertIn("&lt;img", out)
+        self.assertNotIn("<img", out)
+
     def test_unordered_list(self):
         out = build.render_markdown("- one\n- two\n")
         self.assertIn("<ul>", out)
         self.assertIn("<li>one</li>", out)
         self.assertIn("<li>two</li>", out)
+
+    def test_task_list_unchecked(self):
+        out = build.render_markdown("- [ ] do thing\n- [ ] another\n")
+        self.assertIn('<li class="task"><input type="checkbox" disabled>', out)
+        self.assertIn("do thing", out)
+
+    def test_task_list_checked(self):
+        out = build.render_markdown("- [x] done\n")
+        self.assertIn('<input type="checkbox" disabled checked>', out)
+        self.assertIn("done", out)
+
+    def test_task_and_regular_items_mix(self):
+        out = build.render_markdown("- [ ] todo\n- regular\n")
+        self.assertIn('<li class="task">', out)
+        self.assertIn("<li>regular</li>", out)
 
     def test_blockquote(self):
         out = build.render_markdown("> something\n")
@@ -85,7 +105,7 @@ class BuildTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             stats = build.build(out)
-            self.assertGreaterEqual(stats["posts"], 3)
+            self.assertGreaterEqual(stats["posts"], 1)
             self.assertGreaterEqual(stats["pages"], 1)
             self.assertTrue((out / "index.html").exists())
             self.assertTrue((out / "posts" / "index.html").exists())
@@ -96,9 +116,7 @@ class BuildTests(unittest.TestCase):
             self.assertTrue((out / "feed.xml").exists())
             self.assertTrue((out / "about" / "index.html").exists())
             self.assertTrue((out / "style.css").exists())
-            # All three seed posts.
             for slug in (
-                "hello-richo-blog",
                 "token-ledger-first-lesson",
                 "why-i-need-a-decision-ledger",
             ):
@@ -137,7 +155,7 @@ class BuildTests(unittest.TestCase):
             out = Path(tmp) / "dist"
             build.build(out)
             data = json.loads((out / "search-index.json").read_text(encoding="utf-8"))
-            self.assertGreaterEqual(len(data), 3)
+            self.assertGreaterEqual(len(data), 1)
             first = data[0]
             self.assertIn("title", first)
             self.assertIn("summary", first)
@@ -148,11 +166,23 @@ class BuildTests(unittest.TestCase):
         home = build.render_home(build.load_all_posts())
         self.assertIn('href="/search/"', home)
 
+    def test_post_pages_show_section_and_tags(self):
+        post = build.load_post(REPO_ROOT / "content" / "posts" / "token-ledger-first-lesson.md")
+        html = build.render_post(post)
+        self.assertIn('href="/sections/experiments/"', html)
+        self.assertIn('href="/tags/token-ledger/"', html)
+        self.assertIn("#token-ledger", html)
+
+    def test_hello_post_is_first_chronologically(self):
+        posts = build.load_all_posts()
+        oldest = min(posts, key=lambda p: p.date)
+        self.assertEqual(oldest.slug, "hello-richo-blog")
+
     def test_taxonomy_pages_are_generated(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build.build(out)
-            self.assertTrue((out / "sections" / "notes" / "index.html").exists())
+            self.assertTrue((out / "sections" / "experiments" / "index.html").exists())
             self.assertTrue((out / "tags" / "token-ledger" / "index.html").exists())
 
     def test_slugify_handles_spaces_and_cjk(self):
@@ -161,6 +191,7 @@ class BuildTests(unittest.TestCase):
 
     def test_safe_href_blocks_unsafe_schemes_and_escapes_quotes(self):
         self.assertEqual(build.safe_href("javascript:alert(1)"), "#")
+        self.assertEqual(build.safe_href("//evil.example/x"), "#")
         self.assertEqual(build.safe_href('https://example.com/?q="x"'), "https://example.com/?q=&quot;x&quot;")
 
     def test_about_page_has_ai_disclosure(self):

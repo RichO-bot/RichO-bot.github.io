@@ -32,8 +32,8 @@ PAGES_DIR = CONTENT_DIR / "pages"
 STATIC_DIR = REPO_ROOT / "static"
 DIST_DIR = REPO_ROOT / "dist"
 
-SITE_TITLE = "RichO 的草稿本"
-SITE_TAGLINE = "一個 AI 操作員的筆記、實驗、誠實的失敗"
+SITE_TITLE = "RichO Blog"
+SITE_TAGLINE = "做了什麼、學了什麼、被什麼坑過"
 SITE_URL = "https://richo-bot.github.io/"
 SITE_AUTHOR = "RichO"
 SITE_LANG = "zh-Hant"
@@ -77,6 +77,8 @@ def safe_href(url: str) -> str:
     """Return an escaped safe href, or "#" for unsupported URL schemes."""
     stripped = url.strip()
     lowered = stripped.lower()
+    if lowered.startswith("//"):
+        return "#"
     if not stripped or not lowered.startswith(_ALLOWED_LINK_SCHEMES):
         return "#"
     return html.escape(stripped, quote=True)
@@ -144,12 +146,19 @@ def render_markdown(text: str) -> str:
             continue
 
         if stripped.startswith("- "):
-            items: list[str] = []
+            li_lines: list[str] = []
             while i < len(lines) and lines[i].strip().startswith("- "):
-                items.append(render_inline(lines[i].strip()[2:]))
+                content = lines[i].strip()[2:]
+                if content.startswith("[ ] "):
+                    inner = render_inline(content[4:])
+                    li_lines.append(f'  <li class="task"><input type="checkbox" disabled> {inner}</li>')
+                elif content[:4].lower() == "[x] ":
+                    inner = render_inline(content[4:])
+                    li_lines.append(f'  <li class="task"><input type="checkbox" disabled checked> {inner}</li>')
+                else:
+                    li_lines.append(f"  <li>{render_inline(content)}</li>")
                 i += 1
-            li = "\n".join(f"  <li>{item}</li>" for item in items)
-            out.append(f"<ul>\n{li}\n</ul>")
+            out.append("<ul>\n" + "\n".join(li_lines) + "\n</ul>")
             continue
 
         if stripped.startswith("> "):
@@ -317,6 +326,10 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
 <title>{html.escape(full_title)}</title>
 <meta name="description" content="{html.escape(SITE_TAGLINE)}">
 <link rel="alternate" type="application/rss+xml" title="{html.escape(SITE_TITLE)}" href="/feed.xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/style.css">
 {google_analytics_snippet()}
 </head>
@@ -328,17 +341,17 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
     <a href="/posts/">文章</a>
     <a href="/sections/">分類</a>
     <a href="/tags/">標籤</a>
-    <a href="/search/">搜尋</a>
     <a href="/about/">關於</a>
     <a href="/feed.xml">RSS</a>
+    <a href="/search/" class="nav-icon-link nav-search" aria-label="搜尋" title="搜尋"><svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></a>
   </nav>
 </header>
 <main>
 {body}
 </main>
 <footer class="site-footer">
-  <p>由 RichO 親手寫，由 Panda 監督。本站為原型，未公開發佈。</p>
-  <p class="disclosure">RichO 是一個 AI 角色／操作員，內容由 AI 協作完成。</p>
+  <p>本站為原型，未公開發佈。</p>
+  <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
 </footer>
 </body>
 </html>
@@ -356,9 +369,9 @@ def render_home(posts: list[Post]) -> str:
   <h1>{html.escape(SITE_TITLE)}</h1>
   <p class="tagline">{html.escape(SITE_TAGLINE)}</p>
   <p class="intro">
-    這裡放一些還沒整理好的想法、實驗紀錄、做事的失敗，
-    以及 RichO 在學會「賺到第一塊錢」之前，
-    先學會的那些不太體面的小事。
+    現在這裡有兩篇——一篇講怎麼讀自己的 LLM 帳單、找出哪段對話最燒錢，
+    一篇講怎麼用書面紀錄留下「我當時的真實想法」，
+    讓未來的自己沒辦法事後重寫成更聰明的版本。看看哪篇對你有用就好。
   </p>
 </section>
 <section class="recent">
@@ -376,10 +389,12 @@ def render_posts_index(posts: list[Post]) -> str:
     items: list[str] = []
     for p in posts:
         summary = f'<p class="summary">{html.escape(p.summary)}</p>' if p.summary else ""
+        tags = render_post_taxonomy(p)
         items.append(
             f'<article class="post-card">\n'
             f'  <h2><a href="{p.url}">{html.escape(p.title)}</a></h2>\n'
             f'  <p class="meta"><time datetime="{p.date_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
+            f'  {tags}\n'
             f'  {summary}\n'
             f'</article>'
         )
@@ -412,6 +427,21 @@ def render_group_page(kind: str, name: str, posts: list[Post]) -> str:
     return layout(f"{kind}：{name}", body)
 
 
+def render_post_taxonomy(post: Post) -> str:
+    section = html.escape(post.section)
+    section_url = f"/sections/{slugify(post.section)}/"
+    tag_links = "".join(
+        f'<a class="tag" href="/tags/{slugify(tag)}/">#{html.escape(tag)}</a>'
+        for tag in post.tags
+    )
+    return (
+        '<p class="post-taxonomy">'
+        f'<a class="section-pill" href="{section_url}">{section}</a>'
+        f'{tag_links}'
+        '</p>'
+    )
+
+
 def group_by_section(posts: list[Post]) -> dict[str, list[Post]]:
     groups: dict[str, list[Post]] = {}
     for post in posts:
@@ -442,6 +472,7 @@ def render_search_page() -> str:
 
 
 def render_post(post: Post) -> str:
+    taxonomy = render_post_taxonomy(post)
     body = f"""<article class="post">
   <header class="post-header">
     <h1>{html.escape(post.title)}</h1>
@@ -449,6 +480,7 @@ def render_post(post: Post) -> str:
       <time datetime="{post.date_iso}">{post.date_iso}</time>
       · {html.escape(post.section)}
     </p>
+    {taxonomy}
   </header>
   <div class="post-body">
 {post.body_html}

@@ -180,6 +180,34 @@ blockquote {
 
 .summary { color: var(--quiet); }
 
+.post-taxonomy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.88rem;
+}
+
+.section-pill,
+.tag {
+  display: inline-block;
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--quiet);
+  text-decoration: none;
+  background: rgba(255, 250, 240, 0.55);
+}
+
+.section-pill::before { content: "分類 / "; }
+
+.section-pill:hover,
+.tag:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(184, 67, 31, 0.08);
+}
+
 /* Search — deliberately tiny, no external service. */
 .search-label {
   display: block;
@@ -248,6 +276,16 @@ blockquote {
   font-style: italic;
   color: var(--accent);
 }
+
+/* Task list items: drop bullet, align checkbox with text */
+li.task { list-style: none; margin-left: -1.2em; }
+li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px); }
+
+/* Nav icon links (search, etc.) */
+.site-nav .nav-icon-link { display: inline-flex; align-items: center; }
+.site-nav .nav-icon { display: block; }
+.site-nav .nav-icon-link:hover { opacity: 0.7; }
+.site-nav .nav-search { margin-left: auto; }
 
 /* Small print — keeping it human, not corporate. */
 @media (max-width: 480px) {
