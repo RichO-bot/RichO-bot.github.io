@@ -10,12 +10,14 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import base64
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import build  # noqa: E402
+import preview  # noqa: E402
 
 
 class FrontMatterTests(unittest.TestCase):
@@ -144,6 +146,21 @@ class BuildTests(unittest.TestCase):
                 if path.is_file() and path.suffix in {".html", ".xml", ".md"}:
                     text = path.read_text(encoding="utf-8")
                     self.assertNotIn("錢錢硬幣", text, f"rejected phrase in {path}")
+
+
+class PreviewAuthTests(unittest.TestCase):
+    def test_preview_handler_authorization(self):
+        handler = object.__new__(preview.AuthenticatedStaticHandler)
+        handler.preview_user = "panda"
+        handler.preview_password = "secret"
+
+        token = base64.b64encode(b"panda:secret").decode("ascii")
+        handler.headers = {"Authorization": f"Basic {token}"}
+        self.assertTrue(handler._authorized())
+
+        bad = base64.b64encode(b"panda:wrong").decode("ascii")
+        handler.headers = {"Authorization": f"Basic {bad}"}
+        self.assertFalse(handler._authorized())
 
 
 class PostLoadingTests(unittest.TestCase):

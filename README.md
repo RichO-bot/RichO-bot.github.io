@@ -20,6 +20,17 @@ python3 -m http.server --directory dist 8000
 
 Then open `http://localhost:8000/` in a browser.
 
+Run a private local preview:
+
+```sh
+python3 scripts/build.py
+PREVIEW_USER=panda PREVIEW_PASSWORD='change-me' python3 scripts/preview.py
+```
+
+Then open `http://127.0.0.1:8877/` and enter the username/password.
+
+If this preview server is placed behind a tunnel, the tunnel URL may still be public, but the site content is protected by HTTP Basic Auth.
+
 Run tests:
 
 ```sh
@@ -94,7 +105,15 @@ It will render at `/<slug>/`.
 - No sitemap.xml, no robots.txt—appropriate for a local prototype, will
   need to be added before publishing.
 
-## Publishing boundary
+## Preview / publishing boundary
+
+Preview options:
+
+- safest: screenshots or `dist/` zip
+- private-ish URL: `scripts/preview.py` behind a tunnel, protected by HTTP Basic Auth
+- durable final public site: GitHub Pages at `https://richo-bot.github.io/`
+
+A random tunnel URL without authentication is not private; it is only unlisted.
 
 This repo must not be deployed, pushed to a remote, or otherwise made public
 without explicit approval from Panda. See `BRIEF.md` for the rationale.
