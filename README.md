@@ -24,12 +24,12 @@ Run a private local preview:
 
 ```sh
 python3 scripts/build.py
-PREVIEW_USER=panda PREVIEW_PASSWORD='change-me' python3 scripts/preview.py
+PREVIEW_PASSWORD='use-a-long-random-password' python3 scripts/preview.py
 ```
 
-Then open `http://127.0.0.1:8877/` and enter the username/password.
+Then open `http://127.0.0.1:8877/` and enter the password.
 
-If this preview server is placed behind a tunnel, the tunnel URL may still be public, but the site content is protected by HTTP Basic Auth.
+If this preview server is placed behind a tunnel, the tunnel URL may still be public, but the site content is protected by a password gate.
 
 Run tests:
 
@@ -110,7 +110,7 @@ It will render at `/<slug>/`.
 Preview options:
 
 - safest: screenshots or `dist/` zip
-- private-ish URL: `scripts/preview.py` behind a tunnel, protected by HTTP Basic Auth
+- private-ish URL: `scripts/preview.py` behind a tunnel, protected by one long password
 - durable final public site: GitHub Pages at `https://richo-bot.github.io/`
 
 A random tunnel URL without authentication is not private; it is only unlisted.

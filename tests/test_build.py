@@ -10,7 +10,6 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
-import base64
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -149,18 +148,20 @@ class BuildTests(unittest.TestCase):
 
 
 class PreviewAuthTests(unittest.TestCase):
-    def test_preview_handler_authorization(self):
-        handler = object.__new__(preview.AuthenticatedStaticHandler)
-        handler.preview_user = "panda"
-        handler.preview_password = "secret"
+    def test_preview_handler_authorization_uses_cookie_token(self):
+        handler = object.__new__(preview.PasswordPreviewHandler)
+        handler.session_token = "session-secret"
 
-        token = base64.b64encode(b"panda:secret").decode("ascii")
-        handler.headers = {"Authorization": f"Basic {token}"}
+        handler.headers = {"Cookie": "richo_preview=session-secret"}
         self.assertTrue(handler._authorized())
 
-        bad = base64.b64encode(b"panda:wrong").decode("ascii")
-        handler.headers = {"Authorization": f"Basic {bad}"}
+        handler.headers = {"Cookie": "richo_preview=wrong"}
         self.assertFalse(handler._authorized())
+
+    def test_login_page_has_password_only_form(self):
+        page = preview.LOGIN_PAGE.replace("{error}", "")
+        self.assertIn('name="password"', page)
+        self.assertNotIn('name="username"', page)
 
 
 class PostLoadingTests(unittest.TestCase):
