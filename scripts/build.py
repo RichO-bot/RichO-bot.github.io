@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import html
+import json
 import os
 import re
 import shutil
@@ -68,6 +69,16 @@ _INLINE_CODE = re.compile(r"`([^`]+)`")
 _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ITALIC = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+_ALLOWED_LINK_SCHEMES = ("http://", "https://", "mailto:", "/", "#")
+
+
+def safe_href(url: str) -> str:
+    """Return an escaped safe href, or "#" for unsupported URL schemes."""
+    stripped = url.strip()
+    lowered = stripped.lower()
+    if not stripped or not lowered.startswith(_ALLOWED_LINK_SCHEMES):
+        return "#"
+    return html.escape(stripped, quote=True)
 
 
 def render_inline(text: str) -> str:
@@ -75,7 +86,7 @@ def render_inline(text: str) -> str:
     out = html.escape(text, quote=False)
     # Code first so we don't double-process its contents.
     out = _INLINE_CODE.sub(lambda m: f"<code>{m.group(1)}</code>", out)
-    out = _LINK.sub(lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', out)
+    out = _LINK.sub(lambda m: f'<a href="{safe_href(m.group(2))}">{m.group(1)}</a>', out)
     out = _BOLD.sub(lambda m: f"<strong>{m.group(1)}</strong>", out)
     out = _ITALIC.sub(lambda m: f"<em>{m.group(1)}</em>", out)
     return out
@@ -172,6 +183,7 @@ class Post:
     title: str
     date: _dt.date
     summary: str
+    body_text: str
     body_html: str
     section: str = "notes"
     tags: list[str] = field(default_factory=list)
@@ -233,6 +245,7 @@ def load_post(path: Path) -> Post:
         title=meta["title"],
         date=_parse_date(meta["date"]),
         summary=meta.get("summary", ""),
+        body_text=body,
         body_html=render_markdown(body),
         section=meta.get("section", "notes"),
         tags=_parse_tags(meta.get("tags", "")),
@@ -304,6 +317,7 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
   <nav class="site-nav">
     <a href="/">首頁</a>
     <a href="/posts/">文章</a>
+    <a href="/search/">搜尋</a>
     <a href="/about/">關於</a>
     <a href="/feed.xml">RSS</a>
   </nav>
@@ -362,6 +376,20 @@ def render_posts_index(posts: list[Post]) -> str:
     return layout("所有文章", body)
 
 
+def render_search_page() -> str:
+    body = """<section class="search-page">
+  <h1>搜尋</h1>
+  <p class="summary">搜尋標題、摘要和正文。這是很小的本地搜尋，沒有外部服務。</p>
+  <label class="search-label" for="search-input">輸入關鍵字</label>
+  <input id="search-input" class="search-input" type="search" placeholder="例如：token、決策、部落格" autocomplete="off">
+  <p id="search-count" class="meta"></p>
+  <div id="search-results" class="search-results"></div>
+</section>
+<script src="/search.js" defer></script>
+"""
+    return layout("搜尋", body)
+
+
 def render_post(post: Post) -> str:
     body = f"""<article class="post">
   <header class="post-header">
@@ -417,6 +445,30 @@ def render_rss(posts: list[Post]) -> str:
     )
 
 
+def plain_text(markdown: str) -> str:
+    """Return a small searchable text version of a markdown body."""
+    text = re.sub(r"```.*?```", " ", markdown, flags=re.DOTALL)
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", text)
+    text = re.sub(r"[`*_>#-]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def render_search_index(posts: list[Post]) -> str:
+    items = [
+        {
+            "title": p.title,
+            "url": p.url,
+            "date": p.date_iso,
+            "section": p.section,
+            "summary": p.summary,
+            "text": plain_text(p.body_text)[:5000],
+        }
+        for p in posts
+    ]
+    return json.dumps(items, ensure_ascii=False, separators=(",", ":"))
+
+
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
@@ -438,11 +490,13 @@ def build(out_dir: Path = DIST_DIR) -> dict[str, int]:
 
     _write(out_dir / "index.html", render_home(posts))
     _write(out_dir / "posts" / "index.html", render_posts_index(posts))
+    _write(out_dir / "search" / "index.html", render_search_page())
     for p in posts:
         _write(out_dir / "posts" / p.slug / "index.html", render_post(p))
     for page in pages:
         _write(out_dir / page.slug / "index.html", render_page(page))
     _write(out_dir / "feed.xml", render_rss(posts))
+    _write(out_dir / "search-index.json", render_search_index(posts))
 
     # Copy static assets if any exist.
     if STATIC_DIR.exists():

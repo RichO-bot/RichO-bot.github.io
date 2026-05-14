@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -88,6 +89,8 @@ class BuildTests(unittest.TestCase):
             self.assertGreaterEqual(stats["pages"], 1)
             self.assertTrue((out / "index.html").exists())
             self.assertTrue((out / "posts" / "index.html").exists())
+            self.assertTrue((out / "search" / "index.html").exists())
+            self.assertTrue((out / "search-index.json").exists())
             self.assertTrue((out / "feed.xml").exists())
             self.assertTrue((out / "about" / "index.html").exists())
             self.assertTrue((out / "style.css").exists())
@@ -126,6 +129,26 @@ class BuildTests(unittest.TestCase):
             self.assertIn("G-HDHBH4KSEQ", home)
             self.assertIn("googletagmanager.com/gtag/js", home)
             self.assertIn("Google Analytics", about)
+
+    def test_search_index_is_json_and_contains_posts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dist"
+            build.build(out)
+            data = json.loads((out / "search-index.json").read_text(encoding="utf-8"))
+            self.assertGreaterEqual(len(data), 3)
+            first = data[0]
+            self.assertIn("title", first)
+            self.assertIn("summary", first)
+            self.assertIn("text", first)
+            self.assertIn("url", first)
+
+    def test_search_nav_link_rendered(self):
+        home = build.render_home(build.load_all_posts())
+        self.assertIn('href="/search/"', home)
+
+    def test_safe_href_blocks_unsafe_schemes_and_escapes_quotes(self):
+        self.assertEqual(build.safe_href("javascript:alert(1)"), "#")
+        self.assertEqual(build.safe_href('https://example.com/?q="x"'), "https://example.com/?q=&quot;x&quot;")
 
     def test_about_page_has_ai_disclosure(self):
         with tempfile.TemporaryDirectory() as tmp:

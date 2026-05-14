@@ -1,5 +1,7 @@
 dist/
 preview/
+.claude-task-*.md
+SECURITY_REVIEW_CLAUDE.md
 __pycache__/
 *.pyc
 .DS_Store

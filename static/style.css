@@ -180,6 +180,33 @@ blockquote {
 
 .summary { color: var(--quiet); }
 
+/* Search — deliberately tiny, no external service. */
+.search-label {
+  display: block;
+  margin-top: 1.5rem;
+  color: var(--quiet);
+  font-size: 0.9rem;
+}
+
+.search-input {
+  width: 100%;
+  margin: 0.35rem 0 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--rule);
+  background: #fffaf0;
+  color: var(--ink);
+  font: inherit;
+}
+
+.search-input:focus {
+  outline: 2px solid rgba(184, 67, 31, 0.25);
+  border-color: var(--accent);
+}
+
+.search-result {
+  margin: 1.2rem 0;
+}
+
 /* Single post */
 .post-header h1 { margin-bottom: 0.2em; }
 .post-body { margin-top: 1.6em; }

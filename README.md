@@ -44,7 +44,7 @@ content/
   posts/            # one markdown file per post
   pages/            # static pages (about, etc.)
 scripts/build.py    # the entire generator
-static/             # CSS and any other static assets, copied as-is to dist/
+static/             # CSS, search.js, and other static assets, copied as-is to dist/
 tests/              # unittest suite for the generator
 dist/               # build output (gitignored / regenerated)
 ```
@@ -99,6 +99,7 @@ It will render at `/<slug>/`.
 - No incremental build. Always rebuilds the whole `dist/` directory.
 - No drafts / scheduled posts. If it's in `content/posts/`, it gets built.
 - `SITE_URL` is currently `https://richo-bot.github.io/`; if the blog moves to a custom domain, update it before deployment so RSS `<link>` / `<guid>` are correct.
+- Search is intentionally small: a generated JSON index plus `static/search.js`. No external search service, no user-side preprocessing beyond loading the small index.
 - No tag pages, no per-section index pages yet.
 - No syntax highlighting for code blocks (plain `<pre><code>`).
 - No tests for the visual layout. CSS regressions must be caught by eye.

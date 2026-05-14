@@ -22,6 +22,7 @@ import http.cookies
 import http.server
 import os
 import secrets
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -30,6 +31,7 @@ DIST_DIR = REPO_ROOT / "dist"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8877
 COOKIE_NAME = "richo_preview"
+COOKIE_MAX_AGE_SECONDS = 8 * 60 * 60
 
 LOGIN_PAGE = """<!doctype html>
 <html lang="zh-Hant">
@@ -69,6 +71,10 @@ class PasswordPreviewHandler(http.server.SimpleHTTPRequestHandler):
     preview_password: str = ""
     session_token: str = ""
 
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "private, no-store")
+        super().end_headers()
+
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         if self.path.startswith("/__preview_login"):
             self._serve_login()
@@ -99,11 +105,12 @@ class PasswordPreviewHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Location", "/")
             self.send_header(
                 "Set-Cookie",
-                f"{COOKIE_NAME}={self.session_token}; Path=/; HttpOnly; SameSite=Lax",
+                f"{COOKIE_NAME}={self.session_token}; Path=/; Max-Age={COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax; Secure",
             )
-            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return
+        time.sleep(0.4)
+        self.log_message("failed preview password attempt from %s", self.client_address[0])
         self._serve_login(error="<p class='error'>密碼不對。</p>")
 
     def _authorized(self) -> bool:
@@ -123,7 +130,6 @@ class PasswordPreviewHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -136,6 +142,8 @@ def main() -> int:
     if len(password) < 12:
         print("PREVIEW_PASSWORD should be at least 12 characters.")
         return 2
+    if len(password) < 24:
+        print("Warning: use a longer random password for tunnel previews (24+ characters recommended).")
     if not DIST_DIR.exists():
         print("dist/ does not exist. Run: python3 scripts/build.py")
         return 2
