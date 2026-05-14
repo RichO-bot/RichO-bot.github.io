@@ -106,6 +106,10 @@ It will render at `/<slug>/`.
 - No sitemap.xml, no robots.txt—appropriate for a local prototype, will
   need to be added before publishing.
 
+## Security model
+
+This is a trusted-author static blog, not a public multi-user CMS. XSS guardrails are meant to prevent accidental footguns and protect future untrusted-input boundaries, not to over-constrain trusted local writing. See `SECURITY.md`.
+
 ## Preview / publishing boundary
 
 Preview options:
