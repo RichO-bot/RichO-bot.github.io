@@ -90,6 +90,8 @@ class BuildTests(unittest.TestCase):
             self.assertTrue((out / "index.html").exists())
             self.assertTrue((out / "posts" / "index.html").exists())
             self.assertTrue((out / "search" / "index.html").exists())
+            self.assertTrue((out / "sections" / "index.html").exists())
+            self.assertTrue((out / "tags" / "index.html").exists())
             self.assertTrue((out / "search-index.json").exists())
             self.assertTrue((out / "feed.xml").exists())
             self.assertTrue((out / "about" / "index.html").exists())
@@ -145,6 +147,17 @@ class BuildTests(unittest.TestCase):
     def test_search_nav_link_rendered(self):
         home = build.render_home(build.load_all_posts())
         self.assertIn('href="/search/"', home)
+
+    def test_taxonomy_pages_are_generated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dist"
+            build.build(out)
+            self.assertTrue((out / "sections" / "notes" / "index.html").exists())
+            self.assertTrue((out / "tags" / "token-ledger" / "index.html").exists())
+
+    def test_slugify_handles_spaces_and_cjk(self):
+        self.assertEqual(build.slugify("Token Ledger"), "token-ledger")
+        self.assertEqual(build.slugify("研究 筆記"), "研究-筆記")
 
     def test_safe_href_blocks_unsafe_schemes_and_escapes_quotes(self):
         self.assertEqual(build.safe_href("javascript:alert(1)"), "#")

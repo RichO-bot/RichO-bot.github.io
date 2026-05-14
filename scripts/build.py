@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
@@ -79,6 +80,14 @@ def safe_href(url: str) -> str:
     if not stripped or not lowered.startswith(_ALLOWED_LINK_SCHEMES):
         return "#"
     return html.escape(stripped, quote=True)
+
+
+def slugify(value: str) -> str:
+    """Create a small URL slug for tags/sections."""
+    normalized = unicodedata.normalize("NFKC", value).strip().lower()
+    normalized = re.sub(r"\s+", "-", normalized)
+    normalized = re.sub(r"[^\w\-\u4e00-\u9fff]+", "", normalized)
+    return normalized.strip("-") or "untitled"
 
 
 def render_inline(text: str) -> str:
@@ -317,6 +326,8 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
   <nav class="site-nav">
     <a href="/">首頁</a>
     <a href="/posts/">文章</a>
+    <a href="/sections/">分類</a>
+    <a href="/tags/">標籤</a>
     <a href="/search/">搜尋</a>
     <a href="/about/">關於</a>
     <a href="/feed.xml">RSS</a>
@@ -374,6 +385,46 @@ def render_posts_index(posts: list[Post]) -> str:
         )
     body = "<h1>所有文章</h1>\n" + "\n".join(items)
     return layout("所有文章", body)
+
+
+def render_group_index(title: str, base_url: str, groups: dict[str, list[Post]]) -> str:
+    items = []
+    for name, grouped_posts in sorted(groups.items(), key=lambda item: item[0].lower()):
+        items.append(
+            f'<li><a href="{base_url}{slugify(name)}/">{html.escape(name)}</a> '
+            f'<span class="meta">{len(grouped_posts)} 篇</span></li>'
+        )
+    body = f"<h1>{html.escape(title)}</h1>\n<ul class=\"taxonomy-list\">\n" + "\n".join(items) + "\n</ul>"
+    return layout(title, body)
+
+
+def render_group_page(kind: str, name: str, posts: list[Post]) -> str:
+    items = []
+    for p in posts:
+        items.append(
+            f'<article class="post-card">\n'
+            f'  <h2><a href="{p.url}">{html.escape(p.title)}</a></h2>\n'
+            f'  <p class="meta"><time datetime="{p.date_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
+            f'  <p class="summary">{html.escape(p.summary)}</p>\n'
+            f'</article>'
+        )
+    body = f"<h1>{html.escape(kind)}：{html.escape(name)}</h1>\n" + "\n".join(items)
+    return layout(f"{kind}：{name}", body)
+
+
+def group_by_section(posts: list[Post]) -> dict[str, list[Post]]:
+    groups: dict[str, list[Post]] = {}
+    for post in posts:
+        groups.setdefault(post.section, []).append(post)
+    return groups
+
+
+def group_by_tag(posts: list[Post]) -> dict[str, list[Post]]:
+    groups: dict[str, list[Post]] = {}
+    for post in posts:
+        for tag in post.tags:
+            groups.setdefault(tag, []).append(post)
+    return groups
 
 
 def render_search_page() -> str:
@@ -491,6 +542,14 @@ def build(out_dir: Path = DIST_DIR) -> dict[str, int]:
     _write(out_dir / "index.html", render_home(posts))
     _write(out_dir / "posts" / "index.html", render_posts_index(posts))
     _write(out_dir / "search" / "index.html", render_search_page())
+    section_groups = group_by_section(posts)
+    tag_groups = group_by_tag(posts)
+    _write(out_dir / "sections" / "index.html", render_group_index("分類", "/sections/", section_groups))
+    _write(out_dir / "tags" / "index.html", render_group_index("標籤", "/tags/", tag_groups))
+    for section, grouped_posts in section_groups.items():
+        _write(out_dir / "sections" / slugify(section) / "index.html", render_group_page("分類", section, grouped_posts))
+    for tag, grouped_posts in tag_groups.items():
+        _write(out_dir / "tags" / slugify(tag) / "index.html", render_group_page("標籤", tag, grouped_posts))
     for p in posts:
         _write(out_dir / "posts" / p.slug / "index.html", render_post(p))
     for page in pages:
