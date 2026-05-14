@@ -360,12 +360,13 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
     <a href="/tags/">標籤</a>
     <a href="/about/">關於</a>
     <a href="/feed.xml">RSS</a>
-    <a href="/search/" class="nav-icon-link nav-search" aria-label="搜尋" title="搜尋"><svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></a>
+    <button class="nav-icon-link nav-search" type="button" aria-label="搜尋" aria-controls="site-search" aria-expanded="false" data-search-open><svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>搜尋</span></button>
   </nav>
 </header>
 <main>
 {body}
 </main>
+{render_search_dialog()}
 <footer class="site-footer">
   <p>本站為原型，未公開發佈。</p>
   <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
@@ -373,6 +374,24 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
 </body>
 </html>
 """
+
+
+def render_search_dialog() -> str:
+    return """<div class="search-overlay" data-search-overlay hidden>
+  <section class="search-dialog" id="site-search" role="dialog" aria-modal="true" aria-labelledby="site-search-title">
+    <div class="search-head">
+      <p id="site-search-title">搜尋文章</p>
+      <button type="button" data-search-close aria-label="關閉搜尋">Esc</button>
+    </div>
+    <label class="search-field">
+      <span class="sr-only">搜尋標題、標籤或內文</span>
+      <input id="search-input" data-search-input name="q" type="search" autocomplete="off" placeholder="搜尋標題、標籤或內文…">
+    </label>
+    <p id="search-count" class="search-meta" data-search-meta role="status" aria-live="polite">輸入關鍵字開始搜尋</p>
+    <div id="search-results" class="search-results" data-search-results></div>
+  </section>
+</div>
+<script src="/search.js" defer></script>"""
 
 
 def render_home(posts: list[Post]) -> str:
@@ -452,10 +471,10 @@ def render_post_taxonomy(post: Post) -> str:
         for tag in post.tags
     )
     return (
-        '<p class="post-taxonomy">'
-        f'<a class="section-pill" href="{section_url}">{section}</a>'
-        f'{tag_links}'
-        '</p>'
+        '<div class="post-taxonomy" aria-label="文章分類與標籤">'
+        f'<span class="taxonomy-label">分類</span><a class="section-pill" href="{section_url}">{section}</a>'
+        f'<span class="taxonomy-label">標籤</span>{tag_links}'
+        '</div>'
     )
 
 
@@ -477,13 +496,8 @@ def group_by_tag(posts: list[Post]) -> dict[str, list[Post]]:
 def render_search_page() -> str:
     body = """<section class="search-page">
   <h1>搜尋</h1>
-  <p class="summary">搜尋標題、摘要和正文。這是很小的本地搜尋，沒有外部服務。</p>
-  <label class="search-label" for="search-input">輸入關鍵字</label>
-  <input id="search-input" class="search-input" type="search" placeholder="例如：token、決策、部落格" autocomplete="off">
-  <p id="search-count" class="meta"></p>
-  <div id="search-results" class="search-results"></div>
+  <p class="summary">按右上角的搜尋按鈕，或直接按 <kbd>/</kbd> / <kbd>⌘K</kbd> 開啟搜尋。</p>
 </section>
-<script src="/search.js" defer></script>
 """
     return layout("搜尋", body)
 

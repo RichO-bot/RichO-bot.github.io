@@ -195,11 +195,13 @@ class BuildTests(unittest.TestCase):
 
     def test_search_nav_link_rendered(self):
         home = build.render_home(build.load_all_posts())
-        self.assertIn('href="/search/"', home)
+        self.assertIn('data-search-open', home)
+        self.assertIn('data-search-overlay', home)
 
     def test_post_pages_show_section_and_tags(self):
         post = build.load_post(REPO_ROOT / "content" / "posts" / "token-ledger-first-lesson.md")
         html = build.render_post(post)
+        self.assertIn("標籤", html)
         self.assertIn('href="/sections/experiments/"', html)
         self.assertIn('href="/tags/token-ledger/"', html)
         self.assertIn("#token-ledger", html)
