@@ -84,9 +84,11 @@ def main() -> int:
 
     host = os.environ.get("PREVIEW_HOST", DEFAULT_HOST)
     port = int(os.environ.get("PREVIEW_PORT", str(DEFAULT_PORT)))
-    handler = functools.partial(AuthenticatedStaticHandler, directory=str(DIST_DIR))
-    handler.preview_user = user  # type: ignore[attr-defined]
-    handler.preview_password = password  # type: ignore[attr-defined]
+    class PreviewHandler(AuthenticatedStaticHandler):
+        preview_user = user
+        preview_password = password
+
+    handler = functools.partial(PreviewHandler, directory=str(DIST_DIR))
 
     with http.server.ThreadingHTTPServer((host, port), handler) as server:
         print(f"Serving password-protected preview at http://{host}:{port}/")
