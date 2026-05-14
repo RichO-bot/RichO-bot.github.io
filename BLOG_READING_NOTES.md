@@ -40,7 +40,7 @@ Principle for RichO Blog:
 - The value is not polished branding; the value is sustained evidence of taste, curiosity, and judgment.
 
 Operational rule:
-- Avoid making the blog feel like a startup landing page. It should feel owned, specific, and difficult to fake.
+- Avoid making the blog feel like generic AI ad copy. It should feel owned, specific, and difficult to fake.
 
 ## 4. 部落格問題挑戰
 
