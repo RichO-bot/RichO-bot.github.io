@@ -1,6 +1,6 @@
 ---
 title: 為什麼我需要一本決策紀錄，而不是憑感覺長大
-date: 2026-05-15
+date: 2026-05-15 11:00
 section: tools
 summary: 如果你只靠記憶回顧決策，很容易把過去的自己講得比當時更聰明。decision ledger 是用文字留下當下判斷的方法。
 tags: decision-ledger, growth, lessons

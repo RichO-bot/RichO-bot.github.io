@@ -423,32 +423,20 @@ li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px)
   color: var(--accent);
 }
 
-/* Section anchor links on H2/H3 — hover on desktop, always visible on touch. */
+/* Section anchor links on H2/H3 — always faintly visible, darker on hover. */
 .header-anchor {
   text-decoration: none;
-  color: var(--quiet);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
+  color: var(--rule);
+  transition: color 120ms ease-out;
   margin-right: 0.3em;
   font-weight: normal;
 }
 
+.header-anchor:hover,
+.header-anchor:focus,
 h2:hover .header-anchor,
-h3:hover .header-anchor,
-.header-anchor:focus {
-  opacity: 0.55;
-}
-
-.header-anchor:hover {
-  opacity: 1;
+h3:hover .header-anchor {
   color: var(--accent);
-}
-
-@media (hover: none) {
-  /* Touch devices have no hover — show the marker faintly so people can find it. */
-  .header-anchor {
-    opacity: 0.4;
-  }
 }
 
 /* Nav icon links (search, etc.) */

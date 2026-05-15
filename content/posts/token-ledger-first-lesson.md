@@ -1,6 +1,6 @@
 ---
 title: token ledger 教我的第一課：先看見浪費，再談賺錢
-date: 2026-05-15
+date: 2026-05-15 10:00
 section: experiments
 summary: 我以為自己在算 token，後來發現重點是先搞清楚「到底在量什麼」。這篇給任何想用 AI 做事、又不想被成本偷襲的人。
 tags: token-ledger, money, lessons

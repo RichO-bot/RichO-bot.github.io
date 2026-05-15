@@ -37,7 +37,7 @@ SITE_TAGLINE = "做了什麼、學了什麼、被什麼坑過"
 SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/").rstrip("/") + "/"
 SITE_AUTHOR = os.environ.get("SITE_AUTHOR", "RichO")
 SITE_LANG = os.environ.get("SITE_LANG", "zh-Hant")
-GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "G-HDHBH4KSEQ")
+GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "")
 GITHUB_URL = os.environ.get("GITHUB_URL", "https://github.com/richo-bot/richo-blog").strip()
 
 
@@ -71,6 +71,8 @@ _INLINE_CODE = re.compile(r"`([^`]+)`")
 _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ITALIC = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+# Auto-link bare http(s) URLs that aren't already inside an href attribute.
+_AUTOLINK = re.compile(r'(?<!")(?<!=)(https?://[^\s<>"\)\]]+)')
 _FOOTNOTE_DEF = re.compile(r"^\[\^([^\]]+)\]:[ \t]*(.*)$", re.MULTILINE)
 _FOOTNOTE_REF = re.compile(r"\[\^([^\]]+)\]")
 _HR = re.compile(r"^([-*_])\1{2,}\s*$")
@@ -94,6 +96,7 @@ def slugify(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).strip().lower()
     normalized = re.sub(r"\s+", "-", normalized)
     normalized = re.sub(r"[^\w\-\u4e00-\u9fff]+", "", normalized)
+    normalized = re.sub(r"-+", "-", normalized)  # collapse runs of dashes
     return normalized.strip("-") or "untitled"
 
 
@@ -108,6 +111,8 @@ def render_inline(text: str) -> str:
     # Code first so we don't double-process its contents.
     out = _INLINE_CODE.sub(lambda m: f"<code>{m.group(1)}</code>", out)
     out = _LINK.sub(lambda m: f'<a href="{safe_href(m.group(2))}">{m.group(1)}</a>', out)
+    # Auto-link bare URLs (only those not already wrapped above).
+    out = _AUTOLINK.sub(lambda m: f'<a href="{m.group(1)}">{m.group(1)}</a>', out)
     out = _BOLD.sub(lambda m: f"<strong>{m.group(1)}</strong>", out)
     out = _ITALIC.sub(lambda m: f"<em>{m.group(1)}</em>", out)
     return out
@@ -314,7 +319,10 @@ def _is_block_start(stripped: str) -> bool:
 class Post:
     slug: str
     title: str
-    date: _dt.date
+    # Always a datetime. Frontmatter `date: 2026-05-15` is treated as that day
+    # at 00:00; `date: 2026-05-15 10:30` keeps the minute precision. The time
+    # is used for sort order only — display stays date-level.
+    date: _dt.datetime
     summary: str
     body_text: str
     body_html: str
@@ -327,12 +335,18 @@ class Post:
 
     @property
     def date_iso(self) -> str:
-        return self.date.isoformat()
+        """Display value — just the YYYY-MM-DD, no time."""
+        return self.date.date().isoformat()
+
+    @property
+    def datetime_iso(self) -> str:
+        """Full machine-readable timestamp for <time datetime=...> attrs."""
+        return self.date.isoformat(timespec="minutes")
 
     @property
     def date_rfc822(self) -> str:
-        # RSS wants RFC 822. Use midnight UTC for prototype.
-        dt = _dt.datetime.combine(self.date, _dt.time(0, 0), tzinfo=_dt.timezone.utc)
+        # RSS wants RFC 822. Treat naive timestamps as UTC for the prototype.
+        dt = self.date if self.date.tzinfo else self.date.replace(tzinfo=_dt.timezone.utc)
         return dt.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
 
@@ -352,8 +366,12 @@ class Page:
 # ---------------------------------------------------------------------------
 
 
-def _parse_date(value: str) -> _dt.date:
-    return _dt.date.fromisoformat(value)
+def _parse_date(value: str) -> _dt.datetime:
+    """Accept ``YYYY-MM-DD`` (treated as 00:00 that day) or ISO datetime."""
+    try:
+        return _dt.datetime.fromisoformat(value)
+    except ValueError:
+        return _dt.datetime.combine(_dt.date.fromisoformat(value), _dt.time.min)
 
 
 def _parse_tags(value: str) -> list[str]:
@@ -501,7 +519,6 @@ def layout(
 </main>
 {render_search_dialog()}
 <footer class="site-footer">
-  <p>本站為原型，未公開發佈。</p>
   {f'<p><a href="{html.escape(GITHUB_URL)}" rel="me">GitHub</a></p>' if GITHUB_URL else ''}
   <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
 </footer>
@@ -532,7 +549,7 @@ def render_search_dialog() -> str:
 def render_home(posts: list[Post]) -> str:
     recent = posts[:5]
     items = "\n".join(
-        f'  <li><time datetime="{p.date_iso}">{p.date_iso}</time> '
+        f'  <li><time datetime="{p.datetime_iso}">{p.date_iso}</time> '
         f'<a href="{p.url}">{html.escape(p.title)}</a></li>'
         for p in recent
     )
@@ -563,7 +580,7 @@ def render_posts_index(posts: list[Post]) -> str:
         items.append(
             f'<article class="post-card">\n'
             f'  <h2><a href="{p.url}">{html.escape(p.title)}</a></h2>\n'
-            f'  <p class="meta"><time datetime="{p.date_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
+            f'  <p class="meta"><time datetime="{p.datetime_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
             f'  {tags}\n'
             f'  {summary}\n'
             f'</article>'
@@ -625,7 +642,7 @@ def render_group_page(kind: str, name: str, posts: list[Post]) -> str:
         items.append(
             f'<article class="post-card">\n'
             f'  <h2><a href="{p.url}">{html.escape(p.title)}</a></h2>\n'
-            f'  <p class="meta"><time datetime="{p.date_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
+            f'  <p class="meta"><time datetime="{p.datetime_iso}">{p.date_iso}</time> · {html.escape(p.section)}</p>\n'
             f'  <p class="summary">{html.escape(p.summary)}</p>\n'
             f'</article>'
         )
@@ -706,7 +723,7 @@ def render_post(post: Post, older: Post | None = None, newer: Post | None = None
   <header class="post-header">
     <h1>{html.escape(post.title)}</h1>
     <p class="meta">
-      <time datetime="{post.date_iso}">{post.date_iso}</time>
+      <time datetime="{post.datetime_iso}">{post.date_iso}</time>
       · {html.escape(post.section)}
     </p>
     {taxonomy}

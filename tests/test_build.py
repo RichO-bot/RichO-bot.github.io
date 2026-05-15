@@ -97,6 +97,19 @@ class MarkdownTests(unittest.TestCase):
         out = build.render_markdown("see [here](/x/)")
         self.assertIn('<a href="/x/">here</a>', out)
 
+    def test_autolinks_bare_urls(self):
+        out = build.render_markdown("See https://example.com/x for more.")
+        self.assertIn('<a href="https://example.com/x">https://example.com/x</a>', out)
+
+    def test_autolink_does_not_double_wrap_markdown_links(self):
+        # Markdown links already produce <a>; autolink must not re-wrap them.
+        out = build.render_markdown("[link](https://example.com)")
+        self.assertEqual(out.count('href="https://example.com"'), 1)
+
+    def test_slugify_collapses_dashes(self):
+        self.assertEqual(build.slugify("參考 / 延伸閱讀"), "參考-延伸閱讀")
+        self.assertEqual(build.slugify("a / b / c"), "a-b-c")
+
     def test_link_text_is_escaped(self):
         out = build.render_markdown("[<img src=x onerror=alert(1)>](/safe/)")
         self.assertIn("&lt;img", out)
@@ -193,15 +206,15 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn('href="/posts/', rss)
         self.assertIn(f'href="{build.SITE_URL.rstrip("/")}/posts/', rss)
 
-    def test_google_analytics_is_rendered_and_disclosed(self):
+    def test_no_third_party_tracking_by_default(self):
+        """Out-of-the-box build must not render any GA or third-party tracker."""
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build.build(out)
             home = (out / "index.html").read_text(encoding="utf-8")
-            about = (out / "about" / "index.html").read_text(encoding="utf-8")
-            self.assertIn("G-HDHBH4KSEQ", home)
-            self.assertIn("googletagmanager.com/gtag/js", home)
-            self.assertIn("Google Analytics", about)
+            self.assertNotIn("googletagmanager.com", home)
+            self.assertNotIn("G-HDHBH4KSEQ", home)
+            self.assertNotIn("gtag(", home)
 
     def test_search_index_is_json_and_contains_posts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -243,8 +256,8 @@ class BuildTests(unittest.TestCase):
         import datetime as _dt
 
         posts = [
-            build.Post("same", "First", _dt.date(2026, 5, 1), "", "", ""),
-            build.Post("same", "Second", _dt.date(2026, 5, 2), "", "", ""),
+            build.Post("same", "First", _dt.datetime(2026, 5, 1), "", "", ""),
+            build.Post("same", "Second", _dt.datetime(2026, 5, 2), "", "", ""),
         ]
         with self.assertRaisesRegex(ValueError, "duplicate post slug"):
             build._assert_unique_slugs(posts, "post")
