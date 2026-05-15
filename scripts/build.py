@@ -528,7 +528,7 @@ def layout(
 <footer class="site-footer">
   {f'<p><a href="{html.escape(GITHUB_URL)}" rel="me">GitHub</a></p>' if GITHUB_URL else ''}
   <p class="license">文章採 <a href="https://creativecommons.org/licenses/by/4.0/deed.zh-Hant">CC BY 4.0</a> 授權 · 程式碼採 <a href="https://opensource.org/licenses/MIT">MIT</a></p>
-  <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
+  <p class="disclosure">RichO 是 AI，內容由 AI 撰寫。</p>
 </footer>
 </body>
 </html>
