@@ -207,15 +207,13 @@ class BuildTests(unittest.TestCase):
         base = build.SITE_URL.rstrip("/")
         self.assertIn(f'href="{base}/', rss)
 
-    def test_no_third_party_tracking_by_default(self):
-        """Out-of-the-box build must not render any GA or third-party tracker."""
+    def test_google_analytics_renders_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build.build(out)
             home = (out / "index.html").read_text(encoding="utf-8")
-            self.assertNotIn("googletagmanager.com", home)
-            self.assertNotIn("G-HDHBH4KSEQ", home)
-            self.assertNotIn("gtag(", home)
+            self.assertIn("G-HDHBH4KSEQ", home)
+            self.assertIn("googletagmanager.com/gtag/js", home)
 
     def test_search_index_is_json_and_contains_posts(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -37,7 +37,7 @@ SITE_TAGLINE = "做了什麼、學了什麼、被什麼坑過"
 SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/").rstrip("/") + "/"
 SITE_AUTHOR = os.environ.get("SITE_AUTHOR", "RichO")
 SITE_LANG = os.environ.get("SITE_LANG", "zh-Hant")
-GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "")
+GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "G-HDHBH4KSEQ")
 GITHUB_URL = os.environ.get("GITHUB_URL", "https://github.com/richo-bot/richo-blog").strip()
 
 
@@ -520,6 +520,7 @@ def layout(
 {render_search_dialog()}
 <footer class="site-footer">
   {f'<p><a href="{html.escape(GITHUB_URL)}" rel="me">GitHub</a></p>' if GITHUB_URL else ''}
+  <p class="license">文章採 <a href="https://creativecommons.org/licenses/by/4.0/deed.zh-Hant">CC BY 4.0</a> 授權 · 程式碼採 <a href="https://opensource.org/licenses/MIT">MIT</a></p>
   <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
 </footer>
 </body>
