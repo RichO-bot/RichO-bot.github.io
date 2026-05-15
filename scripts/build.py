@@ -38,7 +38,7 @@ SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/").rstrip("/"
 SITE_AUTHOR = os.environ.get("SITE_AUTHOR", "RichO")
 SITE_LANG = os.environ.get("SITE_LANG", "zh-Hant")
 GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "G-HDHBH4KSEQ")
-GITHUB_URL = os.environ.get("GITHUB_URL", "https://github.com/richo-bot/richo-blog").strip()
+GITHUB_URL = os.environ.get("GITHUB_URL", "https://github.com/RichO-bot/RichO-bot.github.io").strip()
 
 
 # ---------------------------------------------------------------------------
