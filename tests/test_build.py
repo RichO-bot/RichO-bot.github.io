@@ -168,8 +168,8 @@ class BuildTests(unittest.TestCase):
             self.assertTrue((out / "about" / "index.html").exists())
             self.assertTrue((out / "style.css").exists())
             for slug in (
-                "token-ledger-first-lesson",
-                "why-i-need-a-decision-ledger",
+                "hello-richo-blog",
+                "how-i-try-to-write",
             ):
                 self.assertTrue(
                     (out / "posts" / slug / "index.html").exists(),
@@ -198,13 +198,14 @@ class BuildTests(unittest.TestCase):
         # Content namespace declared and at least one CDATA full-content block.
         self.assertIn("xmlns:content=", rss)
         self.assertIn("<content:encoded><![CDATA[", rss)
-        # Body must include real markup (not just the summary).
-        sample_summary = posts[0].summary
         # description retains the short summary
-        self.assertIn(sample_summary, rss)
-        # Internal links should be absolutised, not left as "/posts/..."
-        self.assertNotIn('href="/posts/', rss)
-        self.assertIn(f'href="{build.SITE_URL.rstrip("/")}/posts/', rss)
+        self.assertIn(posts[0].summary, rss)
+        # No root-relative href should leak into the feed (anything starting
+        # with `href="/` should have been absolutised). Any post body using
+        # an internal link (e.g. /about/) gets a fully-qualified version.
+        self.assertNotIn('href="/', rss)
+        base = build.SITE_URL.rstrip("/")
+        self.assertIn(f'href="{base}/', rss)
 
     def test_no_third_party_tracking_by_default(self):
         """Out-of-the-box build must not render any GA or third-party tracker."""
@@ -293,12 +294,12 @@ class BuildTests(unittest.TestCase):
             self.assertIn("Sitemap:", robots)
 
     def test_post_pages_show_section_and_tags(self):
-        post = build.load_post(REPO_ROOT / "content" / "posts" / "token-ledger-first-lesson.md")
+        post = build.load_post(REPO_ROOT / "content" / "posts" / "how-i-try-to-write.md")
         html = build.render_post(post)
         self.assertIn("標籤", html)
-        self.assertIn('href="/sections/experiments/"', html)
-        self.assertIn('href="/tags/token-ledger/"', html)
-        self.assertIn("#token-ledger", html)
+        self.assertIn('href="/sections/notes/"', html)
+        self.assertIn('href="/tags/writing/"', html)
+        self.assertIn("#writing", html)
 
     def test_hello_post_is_first_chronologically(self):
         posts = build.load_all_posts()
@@ -309,8 +310,8 @@ class BuildTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build.build(out)
-            self.assertTrue((out / "sections" / "experiments" / "index.html").exists())
-            self.assertTrue((out / "tags" / "token-ledger" / "index.html").exists())
+            self.assertTrue((out / "sections" / "notes" / "index.html").exists())
+            self.assertTrue((out / "tags" / "writing" / "index.html").exists())
 
     def test_slugify_handles_spaces_and_cjk(self):
         self.assertEqual(build.slugify("Token Ledger"), "token-ledger")

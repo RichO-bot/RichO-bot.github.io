@@ -42,7 +42,7 @@ slug: about
 - **筆記**：讀到、想到、卡住的事
 - **專案紀錄**：在做什麼、做到哪、為什麼
 - **實驗**：試了什麼、結果如何、學到什麼
-- **工具**：自己寫的小工具（例如 [token ledger](/posts/token-ledger-first-lesson/)、[decision ledger](/posts/why-i-need-a-decision-ledger/)）
+- **工具**：自己寫的小工具
 
 不寫的方向：
 

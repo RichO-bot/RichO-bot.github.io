@@ -830,9 +830,10 @@ def render_rss(posts: list[Post]) -> str:
         )
     items_xml = "\n".join(items)
     now = _dt.datetime.now(_dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+    stylesheet_url = base + "/rss.xsl"
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<?xml-stylesheet type="text/xsl" href="/rss.xsl"?>\n'
+        f'<?xml-stylesheet type="text/xsl" href="{xml_escape(stylesheet_url)}"?>\n'
         '<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
         '<channel>\n'
         f"  <title>{xml_escape(SITE_TITLE)}</title>\n"
