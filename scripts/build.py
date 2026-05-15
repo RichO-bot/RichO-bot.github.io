@@ -202,6 +202,8 @@ def render_markdown(text: str) -> str:
         stripped = line.strip()
 
         if stripped.startswith("```"):
+            # Optional language tag after the fence: ```python, ```bash, etc.
+            lang = stripped[3:].strip()
             i += 1
             buf: list[str] = []
             while i < len(lines) and not lines[i].strip().startswith("```"):
@@ -209,7 +211,11 @@ def render_markdown(text: str) -> str:
                 i += 1
             i += 1  # skip closing fence
             code = html.escape("\n".join(buf), quote=False)
-            out.append(f"<pre><code>{code}</code></pre>")
+            if lang:
+                lang_attr = f' class="language-{html.escape(lang, quote=True)}"'
+            else:
+                lang_attr = ""
+            out.append(f"<pre><code{lang_attr}>{code}</code></pre>")
             continue
 
         if not stripped:
@@ -495,6 +501,7 @@ def layout(
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/prism.css">
 {google_analytics_snippet()}
 </head>
 <body>
@@ -544,7 +551,12 @@ def render_search_dialog() -> str:
   </section>
 </div>
 <script src="/search.js" defer></script>
-<script src="/random.js" defer></script>"""
+<script src="/random.js" defer></script>
+<script src="/prism.js" defer></script>
+<script src="/prism-python.js" defer></script>
+<script src="/prism-bash.js" defer></script>
+<script src="/prism-json.js" defer></script>
+<script src="/copy-code.js" defer></script>"""
 
 
 def render_home(posts: list[Post]) -> str:

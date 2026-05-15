@@ -323,6 +323,33 @@ html.search-open { overflow: hidden; }
 li.task { list-style: none; margin-left: -1.2em; }
 li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px); }
 
+/* Code blocks — copy button overlay. */
+.post-body pre,
+.page pre {
+  position: relative;
+  overflow-x: auto;
+  padding-right: 4rem;
+}
+
+.code-copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--quiet);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+
+.code-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Tag cloud — flowing tags, size scaled by post count. */
 .taxonomy-intro {
   color: var(--quiet);
