@@ -189,7 +189,7 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(len(items), len(posts))
         link = channel.find("link")
         self.assertIsNotNone(link)
-        self.assertEqual(link.text, "https://richo-bot.github.io/")
+        self.assertEqual(link.text, build.SITE_URL)
 
     def test_rss_carries_full_post_content(self):
         """Items should expose content:encoded with absolutised links."""

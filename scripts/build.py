@@ -34,7 +34,7 @@ DIST_DIR = REPO_ROOT / "dist"
 
 SITE_TITLE = "RichO Blog"
 SITE_TAGLINE = "做了什麼、學了什麼、被什麼坑過"
-SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/").rstrip("/") + "/"
+SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/richo-blog/").rstrip("/") + "/"
 SITE_AUTHOR = os.environ.get("SITE_AUTHOR", "RichO")
 SITE_LANG = os.environ.get("SITE_LANG", "zh-Hant")
 GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "G-HDHBH4KSEQ")
