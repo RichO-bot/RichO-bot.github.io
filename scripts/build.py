@@ -471,7 +471,7 @@ def layout(
 <meta property="og:image" content="{html.escape(og_image, quote=True)}">
 <meta property="og:site_name" content="{html.escape(SITE_TITLE)}">
 <meta name="twitter:card" content="summary">
-<link rel="alternate" type="application/rss+xml" title="{html.escape(SITE_TITLE)}" href="/feed.xml">
+<link rel="alternate" type="application/rss+xml" title="{html.escape(SITE_TITLE)}" href="/rss.xml">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -493,7 +493,7 @@ def layout(
     <a href="/posts/" data-random-post>🎲 隨機</a>
     <a href="/blogroll/">部落卷</a>
     <a href="/about/">關於</a>
-    <a href="/feed.xml">訂閱</a>
+    <a href="/rss.xml">RSS</a>
   </nav>
 </header>
 <main>
@@ -612,7 +612,6 @@ def render_tag_cloud(groups: dict[str, list[Post]]) -> str:
         )
     body = (
         '<h1>標籤</h1>\n'
-        '<p class="taxonomy-intro">越大的越常出現。</p>\n'
         '<div class="tag-cloud">\n  '
         + "\n  ".join(links)
         + "\n</div>"
@@ -782,10 +781,26 @@ def render_robots_txt() -> str:
     )
 
 
+_ROOT_RELATIVE_HREF = re.compile(r'(href|src)="(/[^"]*)"')
+
+
+def _absolutize_html(html_str: str, base: str) -> str:
+    """Rewrite root-relative href / src so feed-reader links don't break."""
+    base = base.rstrip("/")
+    return _ROOT_RELATIVE_HREF.sub(lambda m: f'{m.group(1)}="{base}{m.group(2)}"', html_str)
+
+
+def _cdata_safe(text: str) -> str:
+    """Make a string safe to embed inside a CDATA section."""
+    return text.replace("]]>", "]]]]><![CDATA[>")
+
+
 def render_rss(posts: list[Post]) -> str:
+    base = SITE_URL.rstrip("/")
     items: list[str] = []
     for p in posts[:20]:
-        link = SITE_URL.rstrip("/") + p.url
+        link = base + p.url
+        full_html = _cdata_safe(_absolutize_html(p.body_html, base))
         items.append(
             "<item>\n"
             f"  <title>{xml_escape(p.title)}</title>\n"
@@ -793,14 +808,15 @@ def render_rss(posts: list[Post]) -> str:
             f"  <guid isPermaLink=\"true\">{xml_escape(link)}</guid>\n"
             f"  <pubDate>{p.date_rfc822}</pubDate>\n"
             f"  <description>{xml_escape(p.summary)}</description>\n"
+            f"  <content:encoded><![CDATA[{full_html}]]></content:encoded>\n"
             "</item>"
         )
     items_xml = "\n".join(items)
     now = _dt.datetime.now(_dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<?xml-stylesheet type="text/xsl" href="/feed.xsl"?>\n'
-        '<rss version="2.0">\n'
+        '<?xml-stylesheet type="text/xsl" href="/rss.xsl"?>\n'
+        '<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
         '<channel>\n'
         f"  <title>{xml_escape(SITE_TITLE)}</title>\n"
         f"  <link>{xml_escape(SITE_URL)}</link>\n"
@@ -878,7 +894,7 @@ def build(out_dir: Path = DIST_DIR) -> dict[str, int]:
         )
     for page in pages:
         _write(out_dir / page.slug / "index.html", render_page(page))
-    _write(out_dir / "feed.xml", render_rss(posts))
+    _write(out_dir / "rss.xml", render_rss(posts))
     _write(out_dir / "search-index.json", render_search_index(posts))
     _write(out_dir / "404.html", render_404())
     _write(out_dir / "sitemap.xml", render_sitemap(posts, pages))

@@ -318,15 +318,6 @@ html.search-open { overflow: hidden; }
 li.task { list-style: none; margin-left: -1.2em; }
 li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px); }
 
-/* Subscribe page — feed URL block. */
-.feed-url {
-  display: inline-block;
-  padding: 0.4rem 0.6rem;
-  background: var(--code-bg);
-  font-size: 0.95rem;
-  word-break: break-all;
-}
-
 /* Tag cloud — flowing tags, size scaled by post count. */
 .taxonomy-intro {
   color: var(--quiet);

@@ -151,7 +151,7 @@ class BuildTests(unittest.TestCase):
             self.assertTrue((out / "sections" / "index.html").exists())
             self.assertTrue((out / "tags" / "index.html").exists())
             self.assertTrue((out / "search-index.json").exists())
-            self.assertTrue((out / "feed.xml").exists())
+            self.assertTrue((out / "rss.xml").exists())
             self.assertTrue((out / "about" / "index.html").exists())
             self.assertTrue((out / "style.css").exists())
             for slug in (
@@ -177,6 +177,21 @@ class BuildTests(unittest.TestCase):
         link = channel.find("link")
         self.assertIsNotNone(link)
         self.assertEqual(link.text, "https://richo-bot.github.io/")
+
+    def test_rss_carries_full_post_content(self):
+        """Items should expose content:encoded with absolutised links."""
+        posts = build.load_all_posts()
+        rss = build.render_rss(posts)
+        # Content namespace declared and at least one CDATA full-content block.
+        self.assertIn("xmlns:content=", rss)
+        self.assertIn("<content:encoded><![CDATA[", rss)
+        # Body must include real markup (not just the summary).
+        sample_summary = posts[0].summary
+        # description retains the short summary
+        self.assertIn(sample_summary, rss)
+        # Internal links should be absolutised, not left as "/posts/..."
+        self.assertNotIn('href="/posts/', rss)
+        self.assertIn(f'href="{build.SITE_URL.rstrip("/")}/posts/', rss)
 
     def test_google_analytics_is_rendered_and_disclosed(self):
         with tempfile.TemporaryDirectory() as tmp:
