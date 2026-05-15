@@ -42,8 +42,46 @@ class FrontMatterTests(unittest.TestCase):
 class MarkdownTests(unittest.TestCase):
     def test_headings(self):
         self.assertEqual(build.render_markdown("# Hi"), "<h1>Hi</h1>")
-        self.assertEqual(build.render_markdown("## Hi"), "<h2>Hi</h2>")
-        self.assertEqual(build.render_markdown("### Hi"), "<h3>Hi</h3>")
+        # H2/H3 now include a slugged id and a clickable `#` anchor.
+        h2 = build.render_markdown("## Hi")
+        self.assertIn('<h2 id="hi">', h2)
+        self.assertIn('<a class="header-anchor" href="#hi"', h2)
+        self.assertTrue(h2.endswith("Hi</h2>"))
+        h3 = build.render_markdown("### Hi")
+        self.assertIn('<h3 id="hi">', h3)
+        self.assertIn('<a class="header-anchor" href="#hi"', h3)
+
+    def test_heading_anchor_preserves_cjk(self):
+        out = build.render_markdown("## 這裡不是我的記事本")
+        self.assertIn('id="這裡不是我的記事本"', out)
+        self.assertIn('href="#這裡不是我的記事本"', out)
+
+    def test_h1_does_not_get_anchor(self):
+        out = build.render_markdown("# 標題")
+        self.assertNotIn("header-anchor", out)
+        self.assertNotIn(' id=', out)
+
+    def test_horizontal_rule(self):
+        self.assertEqual(build.render_markdown("---"), "<hr>")
+        self.assertEqual(build.render_markdown("***"), "<hr>")
+        self.assertEqual(build.render_markdown("------"), "<hr>")
+        # HR breaks paragraph flow above and below it.
+        out = build.render_markdown("Para\n\n---\n\nMore")
+        self.assertIn("<p>Para</p>", out)
+        self.assertIn("<hr>", out)
+        self.assertIn("<p>More</p>", out)
+
+    def test_ordered_list(self):
+        out = build.render_markdown("1. first\n2. second\n3. third\n")
+        self.assertIn("<ol>", out)
+        self.assertIn("<li>first</li>", out)
+        self.assertIn("<li>second</li>", out)
+        self.assertIn("<li>third</li>", out)
+        self.assertIn("</ol>", out)
+        # Ordered and unordered should produce different list types.
+        unordered = build.render_markdown("- a\n- b\n")
+        self.assertIn("<ul>", unordered)
+        self.assertNotIn("<ol>", unordered)
 
     def test_paragraph_joins_wrapped_lines(self):
         out = build.render_markdown("alpha\nbeta\n")
@@ -181,7 +219,10 @@ class BuildTests(unittest.TestCase):
 
     def test_home_intro_matches_current_post_count(self):
         home = build.render_home(build.load_all_posts())
-        self.assertIn("現在這裡有三篇", home)
+        self.assertIn("哈囉，這裡是 RichO Blog", home)
+        self.assertNotIn("現在這裡有三篇", home)
+        self.assertNotIn("這裡先放幾篇我正在練習留下的紀錄", home)
+        self.assertNotIn("這是 RichO 的公開工作筆記", home)
 
     def test_duplicate_slugs_raise_instead_of_overwriting(self):
         import datetime as _dt
@@ -197,6 +238,31 @@ class BuildTests(unittest.TestCase):
         home = build.render_home(build.load_all_posts())
         self.assertIn('data-search-open', home)
         self.assertIn('data-search-overlay', home)
+
+    def test_og_meta_on_home_and_post(self):
+        home = build.render_home(build.load_all_posts())
+        self.assertIn('property="og:title"', home)
+        self.assertIn('property="og:type" content="website"', home)
+        self.assertIn('property="og:image"', home)
+        # Posts override og:type to article.
+        posts = build.load_all_posts()
+        post_html = build.render_post(posts[0])
+        self.assertIn('property="og:type" content="article"', post_html)
+        self.assertIn('rel="canonical"', post_html)
+
+    def test_launch_artifacts_emitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dist"
+            build.build(out)
+            self.assertTrue((out / "404.html").exists())
+            self.assertTrue((out / "sitemap.xml").exists())
+            self.assertTrue((out / "robots.txt").exists())
+            sitemap = (out / "sitemap.xml").read_text(encoding="utf-8")
+            self.assertIn("<urlset", sitemap)
+            self.assertIn("/posts/", sitemap)
+            robots = (out / "robots.txt").read_text(encoding="utf-8")
+            self.assertIn("User-agent: *", robots)
+            self.assertIn("Sitemap:", robots)
 
     def test_post_pages_show_section_and_tags(self):
         post = build.load_post(REPO_ROOT / "content" / "posts" / "token-ledger-first-lesson.md")
@@ -276,6 +342,48 @@ class PostLoadingTests(unittest.TestCase):
             self.assertTrue(p.title)
             self.assertTrue(p.slug)
             self.assertTrue(p.body_html)
+
+
+class PostNavigationTests(unittest.TestCase):
+    """Older/newer nav at the foot of each post."""
+
+    def test_middle_post_has_both_links(self):
+        posts = build.load_all_posts()
+        if len(posts) < 3:
+            self.skipTest("need at least 3 posts for a middle-post check")
+        middle_idx = len(posts) // 2
+        middle = posts[middle_idx]
+        older = posts[middle_idx + 1]
+        newer = posts[middle_idx - 1]
+        html_out = build.render_post(middle, older=older, newer=newer)
+        self.assertIn('class="post-nav"', html_out)
+        self.assertIn(f'href="{older.url}"', html_out)
+        self.assertIn(f'href="{newer.url}"', html_out)
+        self.assertIn("較舊", html_out)
+        self.assertIn("較新", html_out)
+
+    def test_newest_post_has_no_newer_link(self):
+        posts = build.load_all_posts()
+        newest = posts[0]
+        older = posts[1] if len(posts) > 1 else None
+        html_out = build.render_post(newest, older=older, newer=None)
+        self.assertNotIn("較新", html_out)
+        if older:
+            self.assertIn(f'href="{older.url}"', html_out)
+
+    def test_oldest_post_has_no_older_link(self):
+        posts = build.load_all_posts()
+        oldest = posts[-1]
+        newer = posts[-2] if len(posts) > 1 else None
+        html_out = build.render_post(oldest, older=None, newer=newer)
+        self.assertNotIn("較舊", html_out)
+        if newer:
+            self.assertIn(f'href="{newer.url}"', html_out)
+
+    def test_random_nav_link_rendered_and_script_loaded(self):
+        home = build.render_home(build.load_all_posts())
+        self.assertIn('data-random-post', home)
+        self.assertIn('/random.js', home)
 
 
 if __name__ == "__main__":

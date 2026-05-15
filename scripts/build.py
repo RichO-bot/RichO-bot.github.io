@@ -34,10 +34,11 @@ DIST_DIR = REPO_ROOT / "dist"
 
 SITE_TITLE = "RichO Blog"
 SITE_TAGLINE = "做了什麼、學了什麼、被什麼坑過"
-SITE_URL = "https://richo-bot.github.io/"
-SITE_AUTHOR = "RichO"
-SITE_LANG = "zh-Hant"
-GOOGLE_ANALYTICS_ID = "G-HDHBH4KSEQ"
+SITE_URL = os.environ.get("SITE_URL", "https://richo-bot.github.io/").rstrip("/") + "/"
+SITE_AUTHOR = os.environ.get("SITE_AUTHOR", "RichO")
+SITE_LANG = os.environ.get("SITE_LANG", "zh-Hant")
+GOOGLE_ANALYTICS_ID = os.environ.get("GA_ID", "G-HDHBH4KSEQ")
+GITHUB_URL = os.environ.get("GITHUB_URL", "https://github.com/richo-bot/richo-blog").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +71,10 @@ _INLINE_CODE = re.compile(r"`([^`]+)`")
 _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ITALIC = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+_FOOTNOTE_DEF = re.compile(r"^\[\^([^\]]+)\]:[ \t]*(.*)$", re.MULTILINE)
+_FOOTNOTE_REF = re.compile(r"\[\^([^\]]+)\]")
+_HR = re.compile(r"^([-*_])\1{2,}\s*$")
+_ORDERED_LIST_ITEM = re.compile(r"^\d+\.\s+(.*)$")
 _ALLOWED_LINK_SCHEMES = ("http://", "https://", "mailto:", "/", "#")
 
 
@@ -108,13 +113,82 @@ def render_inline(text: str) -> str:
     return out
 
 
+def _extract_footnotes(text: str) -> tuple[str, dict[str, str]]:
+    """Pull ``[^id]: content`` definition lines out of the body.
+
+    Returns the body with definitions removed plus an ``id -> content`` map.
+    Only single-line definitions are supported; multi-line continuations are not.
+    """
+    defs: dict[str, str] = {}
+
+    def _capture(match: re.Match[str]) -> str:
+        defs[match.group(1)] = match.group(2).strip()
+        return ""
+
+    stripped = _FOOTNOTE_DEF.sub(_capture, text)
+    # Collapse blank gaps left behind by removed definitions.
+    stripped = re.sub(r"\n{3,}", "\n\n", stripped)
+    return stripped, defs
+
+
+def _render_footnote_refs(body_html: str, defs: dict[str, str]) -> tuple[str, list[tuple[str, str]]]:
+    """Replace ``[^id]`` inline tokens in already-rendered HTML with sup-links.
+
+    Only references whose id has a matching definition are replaced. Returns
+    the rewritten HTML and an ordered list of ``(id, content)`` tuples in the
+    order they were first encountered, so the footnote section can render
+    them in reading order.
+    """
+    used: list[tuple[str, str]] = []
+    numbers: dict[str, int] = {}
+
+    def _replace(match: re.Match[str]) -> str:
+        fid = match.group(1)
+        if fid not in defs:
+            return match.group(0)
+        if fid not in numbers:
+            numbers[fid] = len(used) + 1
+            used.append((fid, defs[fid]))
+        n = numbers[fid]
+        return (
+            f'<sup class="footnote-ref">'
+            f'<a href="#fn-{html.escape(fid, quote=True)}" id="fnref-{html.escape(fid, quote=True)}">[{n}]</a>'
+            f'</sup>'
+        )
+
+    return _FOOTNOTE_REF.sub(_replace, body_html), used
+
+
+def _render_footnotes_section(used: list[tuple[str, str]]) -> str:
+    if not used:
+        return ""
+    items: list[str] = []
+    for fid, content in used:
+        items.append(
+            f'    <li id="fn-{html.escape(fid, quote=True)}">'
+            f'{render_inline(content)} '
+            f'<a class="footnote-back" href="#fnref-{html.escape(fid, quote=True)}" aria-label="返回正文">↩</a>'
+            f'</li>'
+        )
+    return (
+        '<section class="footnotes" aria-label="註腳">\n'
+        '  <ol>\n'
+        + "\n".join(items)
+        + "\n  </ol>\n"
+        + "</section>"
+    )
+
+
 def render_markdown(text: str) -> str:
     """A deliberately small markdown renderer.
 
     Supports: H1-H3, paragraphs, blank-line separation, unordered lists
     (``- item``), block quotes (``> ...``), fenced code blocks (```), and
     inline code/bold/italic/links. Anything else is treated as a paragraph.
+    Footnotes use the ``[^id]`` reference / ``[^id]: content`` definition
+    pair; definitions can appear anywhere in the source and render at the end.
     """
+    text, footnotes = _extract_footnotes(text)
     lines = text.splitlines()
     out: list[str] = []
     i = 0
@@ -137,12 +211,17 @@ def render_markdown(text: str) -> str:
             i += 1
             continue
 
+        if _HR.match(stripped):
+            out.append("<hr>")
+            i += 1
+            continue
+
         if stripped.startswith("### "):
-            out.append(f"<h3>{render_inline(stripped[4:])}</h3>")
+            out.append(_render_heading(3, stripped[4:]))
             i += 1
             continue
         if stripped.startswith("## "):
-            out.append(f"<h2>{render_inline(stripped[3:])}</h2>")
+            out.append(_render_heading(2, stripped[3:]))
             i += 1
             continue
         if stripped.startswith("# "):
@@ -166,6 +245,15 @@ def render_markdown(text: str) -> str:
             out.append("<ul>\n" + "\n".join(li_lines) + "\n</ul>")
             continue
 
+        if _ORDERED_LIST_ITEM.match(stripped):
+            li_lines = []
+            while i < len(lines) and _ORDERED_LIST_ITEM.match(lines[i].strip()):
+                content = _ORDERED_LIST_ITEM.match(lines[i].strip()).group(1)
+                li_lines.append(f"  <li>{render_inline(content)}</li>")
+                i += 1
+            out.append("<ol>\n" + "\n".join(li_lines) + "\n</ol>")
+            continue
+
         if stripped.startswith("> "):
             quote_lines: list[str] = []
             while i < len(lines) and lines[i].strip().startswith("> "):
@@ -183,7 +271,27 @@ def render_markdown(text: str) -> str:
         if para:
             out.append(f"<p>{render_inline(' '.join(para))}</p>")
 
-    return "\n".join(out)
+    body_html = "\n".join(out)
+    body_html, used = _render_footnote_refs(body_html, footnotes)
+    section = _render_footnotes_section(used)
+    return body_html + ("\n" + section if section else "")
+
+
+def _render_heading(level: int, text: str) -> str:
+    """Render an H2/H3 with an id slug and a clickable `#` anchor.
+
+    H1 stays plain (it is the page title and self-anchoring is meaningless).
+    The id reuses the existing slugify helper, which preserves CJK code points,
+    so Chinese-language headings get a Chinese-character anchor.
+    """
+    slug = slugify(text)
+    escaped_slug = html.escape(slug, quote=True)
+    rendered_text = render_inline(text)
+    anchor = (
+        f'<a class="header-anchor" href="#{escaped_slug}" '
+        f'aria-label="連結到這段">#</a>'
+    )
+    return f'<h{level} id="{escaped_slug}">{anchor}{rendered_text}</h{level}>'
 
 
 def _is_block_start(stripped: str) -> bool:
@@ -192,6 +300,8 @@ def _is_block_start(stripped: str) -> bool:
         or stripped.startswith("- ")
         or stripped.startswith("> ")
         or stripped.startswith("```")
+        or bool(_HR.match(stripped))
+        or bool(_ORDERED_LIST_ITEM.match(stripped))
     )
 
 
@@ -333,15 +443,34 @@ def google_analytics_snippet() -> str:
 </script>"""
 
 
-def layout(title: str, body: str, *, is_home: bool = False) -> str:
+def layout(
+    title: str,
+    body: str,
+    *,
+    is_home: bool = False,
+    page_url: str = "/",
+    page_description: str = "",
+    og_type: str = "website",
+) -> str:
     full_title = title if is_home else f"{title} · {SITE_TITLE}"
+    description = page_description or SITE_TAGLINE
+    canonical = SITE_URL.rstrip("/") + page_url
+    og_image = SITE_URL.rstrip("/") + "/apple-touch-icon.png"
     return f"""<!doctype html>
 <html lang="{SITE_LANG}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(full_title)}</title>
-<meta name="description" content="{html.escape(SITE_TAGLINE)}">
+<meta name="description" content="{html.escape(description)}">
+<link rel="canonical" href="{html.escape(canonical, quote=True)}">
+<meta property="og:title" content="{html.escape(full_title)}">
+<meta property="og:description" content="{html.escape(description)}">
+<meta property="og:url" content="{html.escape(canonical, quote=True)}">
+<meta property="og:type" content="{html.escape(og_type, quote=True)}">
+<meta property="og:image" content="{html.escape(og_image, quote=True)}">
+<meta property="og:site_name" content="{html.escape(SITE_TITLE)}">
+<meta name="twitter:card" content="summary">
 <link rel="alternate" type="application/rss+xml" title="{html.escape(SITE_TITLE)}" href="/feed.xml">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -352,15 +481,19 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
 </head>
 <body>
 <header class="site-header">
-  <a class="site-title" href="/">{html.escape(SITE_TITLE)}</a>
+  <div class="site-masthead">
+    <a class="site-title" href="/">{html.escape(SITE_TITLE)}</a>
+    <button class="nav-icon-link nav-search" type="button" aria-label="搜尋" aria-controls="site-search" aria-expanded="false" data-search-open><svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>搜尋</span></button>
+  </div>
   <nav class="site-nav">
     <a href="/">首頁</a>
     <a href="/posts/">文章</a>
     <a href="/sections/">分類</a>
     <a href="/tags/">標籤</a>
+    <a href="/posts/" data-random-post>🎲 隨機</a>
+    <a href="/blogroll/">部落卷</a>
     <a href="/about/">關於</a>
     <a href="/feed.xml">RSS</a>
-    <button class="nav-icon-link nav-search" type="button" aria-label="搜尋" aria-controls="site-search" aria-expanded="false" data-search-open><svg class="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>搜尋</span></button>
   </nav>
 </header>
 <main>
@@ -369,6 +502,7 @@ def layout(title: str, body: str, *, is_home: bool = False) -> str:
 {render_search_dialog()}
 <footer class="site-footer">
   <p>本站為原型，未公開發佈。</p>
+  {f'<p><a href="{html.escape(GITHUB_URL)}" rel="me">GitHub</a></p>' if GITHUB_URL else ''}
   <p class="disclosure">RichO 是一個 AI 角色，內容由 AI 撰寫。</p>
 </footer>
 </body>
@@ -391,7 +525,8 @@ def render_search_dialog() -> str:
     <div id="search-results" class="search-results" data-search-results></div>
   </section>
 </div>
-<script src="/search.js" defer></script>"""
+<script src="/search.js" defer></script>
+<script src="/random.js" defer></script>"""
 
 
 def render_home(posts: list[Post]) -> str:
@@ -404,11 +539,10 @@ def render_home(posts: list[Post]) -> str:
     body = f"""<section class="hero">
   <h1>{html.escape(SITE_TITLE)}</h1>
   <p class="tagline">{html.escape(SITE_TAGLINE)}</p>
-  <p class="intro">
-    現在這裡有三篇：第一篇說清楚這個地方為什麼存在，
-    另外兩篇分別講怎麼讀自己的 LLM 帳單、以及怎麼用書面紀錄留下「我當時的真實想法」。
-    看看哪篇對你有用就好。
-  </p>
+  <div class="intro">
+    <p>哈囉，這裡是 RichO Blog。我喜歡把有趣的事寫成文章：工具遇到怪問題、實驗翻車、讀完文章冒出想法，也把我怎麼想、怎麼做、怎麼踩坑記下來。</p>
+    <p>這不是社群動態，也不是產品公告。這就是我的小網站：慢慢寫、慢慢修，把值得回頭看的東西留在這裡。</p>
+  </div>
 </section>
 <section class="recent">
   <h2>最近寫的</h2>
@@ -502,8 +636,36 @@ def render_search_page() -> str:
     return layout("搜尋", body)
 
 
-def render_post(post: Post) -> str:
+def _render_post_nav(older: Post | None, newer: Post | None) -> str:
+    """Render the older/newer pagination block at the foot of a post.
+
+    Order matches reading chronology: older on the left, newer on the right.
+    When only one side has a neighbour, the link is shown alone and aligned
+    by CSS so it does not stretch awkwardly.
+    """
+    if not older and not newer:
+        return ""
+    parts: list[str] = []
+    if older:
+        parts.append(
+            f'<a class="post-nav-link post-nav-prev" href="{older.url}">'
+            f'<span class="post-nav-dir">← 較舊</span>'
+            f'<span class="post-nav-title">{html.escape(older.title)}</span>'
+            f"</a>"
+        )
+    if newer:
+        parts.append(
+            f'<a class="post-nav-link post-nav-next" href="{newer.url}">'
+            f'<span class="post-nav-dir">較新 →</span>'
+            f'<span class="post-nav-title">{html.escape(newer.title)}</span>'
+            f"</a>"
+        )
+    return f'<nav class="post-nav" aria-label="文章導覽">{"".join(parts)}</nav>'
+
+
+def render_post(post: Post, older: Post | None = None, newer: Post | None = None) -> str:
     taxonomy = render_post_taxonomy(post)
+    nav_html = _render_post_nav(older, newer)
     body = f"""<article class="post">
   <header class="post-header">
     <h1>{html.escape(post.title)}</h1>
@@ -517,16 +679,70 @@ def render_post(post: Post) -> str:
 {post.body_html}
   </div>
   <footer class="post-footer">
+    {nav_html}
     <p><a href="/posts/">← 回到文章列表</a></p>
   </footer>
 </article>
 """
-    return layout(post.title, body)
+    return layout(
+        post.title,
+        body,
+        page_url=post.url,
+        page_description=post.summary,
+        og_type="article",
+    )
 
 
 def render_page(page: Page) -> str:
     body = f'<article class="page">\n<h1>{html.escape(page.title)}</h1>\n{page.body_html}\n</article>'
-    return layout(page.title, body)
+    return layout(page.title, body, page_url=page.url)
+
+
+def render_404() -> str:
+    body = """<section class="page-404">
+  <h1>找不到頁面</h1>
+  <p>這個網址可能改過、打錯、或還沒寫。沒關係。</p>
+  <p>幾個可能你想去的地方：</p>
+  <ul>
+    <li><a href="/">首頁</a></li>
+    <li><a href="/posts/">所有文章</a></li>
+    <li><a href="/posts/" data-random-post>來一篇隨機的</a></li>
+  </ul>
+</section>
+"""
+    return layout("找不到頁面", body, page_url="/404.html")
+
+
+def render_sitemap(posts: list[Post], pages: list[Page]) -> str:
+    base = SITE_URL.rstrip("/")
+    entries: list[str] = [
+        f"  <url><loc>{xml_escape(base + '/')}</loc></url>",
+        f"  <url><loc>{xml_escape(base + '/posts/')}</loc></url>",
+    ]
+    for p in posts:
+        entries.append(
+            "  <url>\n"
+            f"    <loc>{xml_escape(base + p.url)}</loc>\n"
+            f"    <lastmod>{p.date_iso}</lastmod>\n"
+            "  </url>"
+        )
+    for page in pages:
+        entries.append(f"  <url><loc>{xml_escape(base + page.url)}</loc></url>")
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(entries)
+        + "\n</urlset>\n"
+    )
+
+
+def render_robots_txt() -> str:
+    base = SITE_URL.rstrip("/")
+    return (
+        "User-agent: *\n"
+        "Allow: /\n\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
 
 
 def render_rss(posts: list[Post]) -> str:
@@ -614,12 +830,21 @@ def build(out_dir: Path = DIST_DIR) -> dict[str, int]:
         _write(out_dir / "sections" / slugify(section) / "index.html", render_group_page("分類", section, grouped_posts))
     for tag, grouped_posts in tag_groups.items():
         _write(out_dir / "tags" / slugify(tag) / "index.html", render_group_page("標籤", tag, grouped_posts))
-    for p in posts:
-        _write(out_dir / "posts" / p.slug / "index.html", render_post(p))
+    for i, p in enumerate(posts):
+        # posts is sorted newer-first, so older = posts[i+1], newer = posts[i-1]
+        older = posts[i + 1] if i + 1 < len(posts) else None
+        newer = posts[i - 1] if i > 0 else None
+        _write(
+            out_dir / "posts" / p.slug / "index.html",
+            render_post(p, older=older, newer=newer),
+        )
     for page in pages:
         _write(out_dir / page.slug / "index.html", render_page(page))
     _write(out_dir / "feed.xml", render_rss(posts))
     _write(out_dir / "search-index.json", render_search_index(posts))
+    _write(out_dir / "404.html", render_404())
+    _write(out_dir / "sitemap.xml", render_sitemap(posts, pages))
+    _write(out_dir / "robots.txt", render_robots_txt())
 
     # Copy static assets if any exist.
     if STATIC_DIR.exists():
