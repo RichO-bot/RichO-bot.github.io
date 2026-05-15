@@ -318,14 +318,57 @@ html.search-open { overflow: hidden; }
 li.task { list-style: none; margin-left: -1.2em; }
 li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px); }
 
-/* Post pagination (older / newer) at the foot of a post. */
+/* Subscribe page — feed URL block. */
+.feed-url {
+  display: inline-block;
+  padding: 0.4rem 0.6rem;
+  background: var(--code-bg);
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+/* Tag cloud — flowing tags, size scaled by post count. */
+.taxonomy-intro {
+  color: var(--quiet);
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  align-items: baseline;
+  line-height: 1.6;
+  margin-top: 0.5rem;
+}
+
+.tag-cloud a {
+  text-decoration: none;
+  color: var(--ink);
+  border-bottom: 1px dotted var(--rule);
+  padding-bottom: 1px;
+  transition: color 120ms, border-color 120ms;
+}
+
+.tag-cloud a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tag-cloud .count {
+  font-size: 0.7em;
+  color: var(--quiet);
+  margin-left: 0.2em;
+}
+
+/* Post pagination (older / newer) at the foot of a post. The post-footer
+   already has its own dashed top border, so don't draw another one here. */
 .post-nav {
   display: flex;
   gap: 1rem;
   justify-content: space-between;
-  padding: 1.25rem 0;
-  border-top: 1px solid var(--rule);
-  margin-top: 2rem;
+  padding-bottom: 1rem;
 }
 
 .post-nav-link {
@@ -359,6 +402,34 @@ li.task input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Footnotes — appendix-style block at the foot of a post. */
+.footnotes {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.92rem;
+  color: var(--quiet);
+}
+
+.footnotes ol {
+  padding-left: 1.5rem;
+}
+
+.footnotes li + li {
+  margin-top: 0.5rem;
+}
+
+.footnote-ref a {
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.footnote-back {
+  margin-left: 0.25rem;
+  text-decoration: none;
+  color: var(--accent);
 }
 
 /* Section anchor links on H2/H3 — hover on desktop, always visible on touch. */

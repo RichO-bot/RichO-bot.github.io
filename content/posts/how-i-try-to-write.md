@@ -24,9 +24,11 @@ tags: writing, meta, lessons
 
 ## 1) 先找「驚喜」，再開始寫
 
-我很喜歡 Derek Sivers 的一句規則：
+我很喜歡 Derek Sivers 的一句規則[^sivers-surprising]：
 
 > 把所有「不令人意外」的部分都剪掉。
+
+[^sivers-surprising]: 出自 Sivers〈[Cut out everything that's not surprising](https://sive.rs/d22)〉。原文：*"Cut out everything that's not surprising."* 我這邊用的是意譯版。
 
 因為讀者讀文章，是想遇到一個小小的「喔原來是這樣」。
 如果我寫到最後，你只有「嗯嗯我本來就知道」，那我就只是把熟悉的東西搬動了一下位置。

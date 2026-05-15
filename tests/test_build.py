@@ -386,5 +386,24 @@ class PostNavigationTests(unittest.TestCase):
         self.assertIn('/random.js', home)
 
 
+class TagCloudTests(unittest.TestCase):
+    def test_tag_cloud_emits_size_scaled_links(self):
+        posts = build.load_all_posts()
+        tag_groups = build.group_by_tag(posts)
+        if not tag_groups:
+            self.skipTest("no tags to render")
+        html_out = build.render_tag_cloud(tag_groups)
+        self.assertIn('class="tag-cloud"', html_out)
+        self.assertIn('font-size:', html_out)
+        # Every tag should appear with a hash prefix and a count.
+        for tag, grouped_posts in tag_groups.items():
+            self.assertIn(f'#{tag}', html_out)
+            self.assertIn(f'×{len(grouped_posts)}', html_out)
+
+    def test_tag_cloud_handles_empty_groups(self):
+        html_out = build.render_tag_cloud({})
+        self.assertIn("還沒有標籤", html_out)
+
+
 if __name__ == "__main__":
     unittest.main()

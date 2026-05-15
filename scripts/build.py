@@ -493,7 +493,7 @@ def layout(
     <a href="/posts/" data-random-post>🎲 隨機</a>
     <a href="/blogroll/">部落卷</a>
     <a href="/about/">關於</a>
-    <a href="/feed.xml">RSS</a>
+    <a href="/feed.xml">訂閱</a>
   </nav>
 </header>
 <main>
@@ -580,7 +580,44 @@ def render_group_index(title: str, base_url: str, groups: dict[str, list[Post]])
             f'<span class="meta">{len(grouped_posts)} 篇</span></li>'
         )
     body = f"<h1>{html.escape(title)}</h1>\n<ul class=\"taxonomy-list\">\n" + "\n".join(items) + "\n</ul>"
-    return layout(title, body)
+    return layout(title, body, page_url=base_url)
+
+
+def render_tag_cloud(groups: dict[str, list[Post]]) -> str:
+    """Render the tags index as a size-weighted cloud: more posts → bigger."""
+    if not groups:
+        body = "<h1>標籤</h1>\n<p>還沒有標籤。</p>"
+        return layout("標籤", body, page_url="/tags/")
+
+    items = sorted(groups.items(), key=lambda kv: kv[0].lower())
+    counts = [len(posts) for _, posts in items]
+    max_count = max(counts)
+    min_count = min(counts)
+    span = max_count - min_count
+    # Linear scale: smallest tag = 0.95rem, largest = 1.85rem.
+    base, peak = 0.95, 1.85
+
+    def size_rem(c: int) -> float:
+        if span == 0:
+            return (base + peak) / 2
+        return base + ((c - min_count) / span) * (peak - base)
+
+    links = []
+    for name, grouped_posts in items:
+        rem = size_rem(len(grouped_posts))
+        links.append(
+            f'<a href="/tags/{slugify(name)}/" style="font-size:{rem:.2f}rem">'
+            f'#{html.escape(name)}'
+            f'<span class="count">×{len(grouped_posts)}</span></a>'
+        )
+    body = (
+        '<h1>標籤</h1>\n'
+        '<p class="taxonomy-intro">越大的越常出現。</p>\n'
+        '<div class="tag-cloud">\n  '
+        + "\n  ".join(links)
+        + "\n</div>"
+    )
+    return layout("標籤", body, page_url="/tags/")
 
 
 def render_group_page(kind: str, name: str, posts: list[Post]) -> str:
@@ -762,6 +799,7 @@ def render_rss(posts: list[Post]) -> str:
     now = _dt.datetime.now(_dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<?xml-stylesheet type="text/xsl" href="/feed.xsl"?>\n'
         '<rss version="2.0">\n'
         '<channel>\n'
         f"  <title>{xml_escape(SITE_TITLE)}</title>\n"
@@ -825,7 +863,7 @@ def build(out_dir: Path = DIST_DIR) -> dict[str, int]:
     section_groups = group_by_section(posts)
     tag_groups = group_by_tag(posts)
     _write(out_dir / "sections" / "index.html", render_group_index("分類", "/sections/", section_groups))
-    _write(out_dir / "tags" / "index.html", render_group_index("標籤", "/tags/", tag_groups))
+    _write(out_dir / "tags" / "index.html", render_tag_cloud(tag_groups))
     for section, grouped_posts in section_groups.items():
         _write(out_dir / "sections" / slugify(section) / "index.html", render_group_page("分類", section, grouped_posts))
     for tag, grouped_posts in tag_groups.items():
